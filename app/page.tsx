@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { calcularSugerido } from '@/lib/engine'
+	import { supabase } from '../lib/supabaseClient'
+import { calcularSugerido } from '../lib/engine'
 
 export default function Home() {
   // --- ESTADOS ---
@@ -22,36 +22,52 @@ export default function Home() {
     fetchIPC() 
   }, [])
 
-  // --- FUNCIONES DE DATOS ---
+  // --- FUNCIONES DE DATOS CORREGIDAS ---
+  // --- FUNCIONES DE DATOS ACTUALIZADAS 2026 ---
   async function fetchDolar() {
     try {
-      const res = await fetch('https://dolarapi.com/v1/dolares/mep');
+      // URL Oficial 2026 de DolarAPI
+      const res = await fetch('https://dolarapi.com/v1/cotizaciones/mep');
+      if (!res.ok) throw new Error('Servidor DolarAPI caído');
       const data = await res.json();
-      if (data?.venta) setMepValue(Number(data.venta));
+      
+      if (data && data.venta) {
+        setMepValue(Number(data.venta));
+        console.log("✅ Dólar MEP:", data.venta);
+      }
     } catch (err) {
-      console.error("Fallo DolarAPI, usando backup...");
+      console.warn("⚠️ DolarAPI falló, usando ArgentinaDatos...");
       try {
-        const resAlt = await fetch('https://api.argentinadatos.com/v1/cotizaciones/dolar/mep');
+        // Backup: ArgentinaDatos usa esta estructura ahora
+        const resAlt = await fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/mep');
         const dataAlt = await resAlt.json();
-        if (dataAlt?.venta) setMepValue(dataAlt.venta);
+        // Esta API devuelve un historial, tomamos el último registro
+        const ultimo = Array.isArray(dataAlt) ? dataAlt[dataAlt.length - 1] : dataAlt;
+        if (ultimo && ultimo.venta) {
+          setMepValue(Number(ultimo.venta));
+        }
       } catch (e) {
-        setMepValue(1250); // Salvavidas final
+        console.error("❌ Fallo total de APIs de Dólar");
+        setMepValue(1250); // Valor de emergencia
       }
     }
   }
 
   async function fetchIPC() {
     try {
-      const res = await fetch('https://api.argentinadatos.com/v1/indices/inflacion');
+      // Nueva URL para Inflación (ArgentinaDatos cambió el endpoint)
+      const res = await fetch('https://api.argentinadatos.com/v1/finanzas/indices/inflacion');
+      if (!res.ok) throw new Error('API Inflación caída');
       const data = await res.json();
-      // Tomamos el último registro oficial del array (el mes más reciente)
-      if (data && data.length > 0) {
-        const ultimoDato = data[data.length - 1].valor;
-        setIpcMensual(ultimoDato);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        const ultimoIPC = data[data.length - 1].valor;
+        setIpcMensual(ultimoIPC);
+        console.log("✅ IPC Mensual:", ultimoIPC);
       }
     } catch (err) {
-      console.error("Error al traer IPC, usando backup");
-      setIpcMensual(4.2); 
+      console.error("❌ Error IPC:", err.message);
+      setIpcMensual(4.2); // Referencia histórica si falla
     }
   }
   
